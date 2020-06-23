@@ -41,6 +41,6 @@ Where `argsBs` contains `fromAssetHash`, `fromChainId`, `fromProxyHash` and `toA
 The contract should check that the balances are sufficient, then reduce the balance and perform the unlock:
 ```
 key = hash(toAssetHash, fromChainId, fromProxyHash, fromAssetHash)
-require(balances[key] > amount)
+require(balances[key] >= amount)
 balances[key] -= amount
 ```
