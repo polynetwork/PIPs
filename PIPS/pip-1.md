@@ -36,7 +36,7 @@ Where `hash` is any supported hashing function of the respective blockchain.
 The `unlock` function should be modified to require the following parameters:
 - bytes memory argsBs
 
-Where `argsBs` contains `fromAssetHash`, `fromChainId`, `fromProxyHash` and `toAssetHash`.
+Where `argsBs` contains `fromAssetHash`, `fromChainId`, `fromProxyHash` and `toAssetHash`, `toAddress` and `amount`.
 
 The contract should check that the balances are sufficient, then reduce the balance and perform the unlock:
 ```
