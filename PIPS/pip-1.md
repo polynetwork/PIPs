@@ -58,6 +58,10 @@ function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes
     balances[key] = totalSupply;
 
     delegatedAssets[_msgSender()] = DelegatedAsset(nativeChainId, nativeLockProxy, nativeAssetHash);
+
+    // call registerAsset here for convenience
+    // registerAsset is explained in a later section
+    registerAsset(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash);
 }
 ```
 
