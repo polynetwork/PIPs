@@ -89,6 +89,17 @@ The `lock` function can be modified to require the following parameters:
 The LockProxy contract should maintain a `balances` mapping of (bytes32 => uint256).
 This `balances` mapping should be updated within the `lock` function:
 ```
+// help prevent user mistakes by ensuring delegated assets only get transferred
+// to the native chainId, LockProxy and assetHash that was originally specified
+DelegatedAsset dAsset = delegatedAssets[fromAssetHash];
+if (dAsset.nativeChainId != 0) {
+    require(
+        dAsset.nativeChainId == toChainId &&
+        dAsset.nativeLockProxy == targetProxyHash &&
+        dAsset.nativeAssetHash == toAssetHash
+    );
+}
+
 bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
 require(registry[key] == true);
 
