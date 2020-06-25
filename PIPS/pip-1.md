@@ -50,6 +50,7 @@ function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes
 
     require(nativeChainId != 0);
     require(delegatedAssets[assetHash].nativeChainId == 0);
+    require(getBalanceFor(assetHash) == totalSupply);
 
     // `hash` is any supported hashing function of the respective blockchain
     bytes32 key = hash(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash);
@@ -58,29 +59,14 @@ function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes
     balances[key] = totalSupply;
 
     delegatedAssets[_msgSender()] = DelegatedAsset(nativeChainId, nativeLockProxy, nativeAssetHash);
-
-    // call registerAsset here for convenience
-    // registerAsset is explained in a later section
-    registerAsset(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash);
 }
 ```
 
-This mapping will be used in the `unlock` function to ensure that delegated tokens will be unlocked only if the specified token is locked.
+This mapping will be used in the `unlock` function to ensure that delegated tokens will be unlocked only if the correct corresponding token is locked.
 
 `setManagerProxy` can be restricted to be called once. After it is called the first time, the `managerProxyContract` address cannot be changed.
 
-`bindProxyHash` and `bindAssetHash` functions can be removed, to replace them we can add a `registerAsset` function:
-
-```
-mapping(bytes32 => bool) registry;
-
-function registerAsset(address fromAssetHash, uint64 toChainId, bytes memory targetProxyHash, bytes memory toAssetHash) {
-    key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
-    registry[key] = true;
-}
-```
-
-This function can be permissionless as its main purpose is to help prevent careless mistakes from the user when calling the `lock` function.
+`bindProxyHash` and `bindAssetHash` functions can be removed.
 
 The `lock` function can be modified to require the following parameters:
 - address fromAssetHash
@@ -105,12 +91,12 @@ if (dAsset.nativeChainId != 0) {
 }
 
 bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
-require(registry[key] == true);
 
 balances[key] += amount;
 
+address fromContractAddr = address(this);
 TxArgs memory txArgs = TxArgs({
-    fromContractAddr: address(this),
+    fromContractAddr: fromContractAddr,
     fromAssetHash: fromAssetHash,
     toAssetHash: toAssetHash,
     toAddress: toAddress,
@@ -118,7 +104,7 @@ TxArgs memory txArgs = TxArgs({
 });
 bytes memory txData = _serializeTxArgs(txArgs);
 
-emit LockEvent(txData);
+emit LockEvent(fromContractAddr, fromAssetHash, toChainId, toAssetHash, toAddress, amount);
 ```
 
 The `unlock` function should be modified to require the following parameters:
