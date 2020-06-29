@@ -104,7 +104,7 @@ TxArgs memory txArgs = TxArgs({
 });
 bytes memory txData = _serializeTxArgs(txArgs);
 
-emit LockEvent(fromContractAddr, fromAssetHash, toChainId, toAssetHash, toAddress, amount);
+emit LockEvent(address fromAssetHash, address fromAddress, uint64 toChainId, bytes toAssetHash, bytes toAddress, uint256 amount, ...optional);
 ```
 
 The `unlock` function should be modified to require the following parameters:
@@ -129,5 +129,5 @@ bytes32 key = hash(args.toAssetHash, args.fromChainId, args.fromContractAddr, ar
 require(balances[key] >= args.amount);
 balances[key] -= args.amount;
 
-emit UnlockEvent(args.fromChainId, args.fromContractAddr, args.fromAssetHash, args.toAssetHash, args.toAddress, args.amount);
+emit UnlockEvent(address toAssetHash, address toAddress, uint256 amount, ...optional);
 ```
