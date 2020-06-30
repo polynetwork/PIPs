@@ -94,53 +94,53 @@ function registerAsset(bytes memory argsBs, bytes memory fromContractAddr, uint6
 
 `bindProxyHash` and `bindAssetHash` functions can be removed.
 
-The `lock` function can be modified to require the following parameters:
-- address fromAssetHash
-- uint64 toChainId
-- bytes memory targetProxyHash
-- bytes memory toAssetHash
-- bytes memory toAddress
-- uint256 amount
-
-The `balances` mapping should be updated within the `lock` function:
+The LockProxy should have a `lock` function which locks tokens from the user and sends a cross-chain transaction to unlock tokens on the targeted `toChainId` and `targetProxyHash`:
 ```
-bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
-require(registry[key] == true);
+function lock(address fromAssetHash, uint64 toChainId, bytes memory targetProxyHash, bytes memory toAssetHash, bytes memory toAddress, uint256 amount) public {
+  bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
+  require(registry[key] == true);
 
-balances[key] += amount;
+  balances[key] += amount;
 
-// transfer tokens from user to LockProxy
+  // transfer tokens from user to LockProxy
 
-address fromContractAddr = address(this);
-TxArgs memory txArgs = TxArgs({
-    fromContractAddr: fromContractAddr,
-    fromAssetHash: fromAssetHash,
-    toAssetHash: toAssetHash,
-    toAddress: toAddress,
-    amount: amount
-});
-bytes memory txData = _serializeTxArgs(txArgs);
+  address fromContractAddr = address(this);
+  TxArgs memory txArgs = TxArgs({
+      fromContractAddr: fromContractAddr,
+      fromAssetHash: fromAssetHash,
+      toAssetHash: toAssetHash,
+      toAddress: toAddress,
+      amount: amount
+  });
+  bytes memory txData = _serializeTxArgs(txArgs);
 
-require(eccm.crossChain(toChainId, targetProxyHash, "unlock", txData), "EthCrossChainManager crossChain executed error!");
+  require(eccm.crossChain(toChainId, targetProxyHash, "unlock", txData), "EthCrossChainManager crossChain executed error!");
 
-emit LockEvent(address fromAssetHash, address fromAddress, uint64 toChainId, bytes toAssetHash, bytes toAddress, uint256 amount, ...optional);
+  emit LockEvent(address fromAssetHash, address fromAddress, uint64 toChainId, bytes toAssetHash, bytes toAddress, uint256 amount, ...optional);
+}
 ```
 
-The `unlock` function should be modified to require the following parameters:
-- bytes memory argsBs
-
-Where `argsBs` contains `fromContractAddr`, `fromAssetHash`, `fromChainId`, `toAssetHash`, `toAddress` and `amount`.
-
-The contract should check that the balances are sufficient, then reduce the balance and perform the unlock:
+The LockProxy should have an `unlock` function which can be called only by the cross-chain manager contract. The function validates the parameters then sends the tokens to the `toAddress`:
 ```
-TxArgs memory args = _deserializTxArgs(argsBs);
-bytes32 key = hash(args.toAssetHash, args.fromChainId, args.fromContractAddr, args.fromAssetHash);
+struct TxArgs {
+  bytes fromContractAddr;
+  bytes fromAssetHash;
+  uint64 fromChainId;
+  bytes toAssetHash;
+  bytes toAddress;
+  uint256 amount;
+}
 
-require(registry[key] == true);
-require(balances[key] >= args.amount);
-balances[key] -= args.amount;
+function unlock(bytes memory argsBs) onlyManagerContract {
+  TxArgs memory args = _deserializTxArgs(argsBs);
+  bytes32 key = hash(args.toAssetHash, args.fromChainId, args.fromContractAddr, args.fromAssetHash);
 
-// send tokens to `toAddress`
+  require(registry[key] == true);
+  require(balances[key] >= args.amount);
+  balances[key] -= args.amount;
 
-emit UnlockEvent(address toAssetHash, address toAddress, uint256 amount, ...optional);
+  // send tokens to `toAddress`
+
+  emit UnlockEvent(address toAssetHash, address toAddress, uint256 amount, ...optional);
+}
 ```
