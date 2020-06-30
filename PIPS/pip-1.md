@@ -34,6 +34,10 @@ constructor (address lockProxyContractAddress, uint64 nativeChainId, bytes memor
 }
 ```
 
+There are two purposes of `delegateAsset`:
+1. For the LockProxy contract to record assets that have been delegated to it
+2. To send a `registerAsset` cross-chain transaction to the specified `nativeChainId` and `nativeLockProxy`
+
 In the LockProxy, `delegateAsset` can be implemented as:
 ```
 mapping(bytes32 => bool) registry;
@@ -54,6 +58,7 @@ function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes
     require(balances[key] == 0);
     require(getBalanceFor(assetHash) == delegatedSupply);
 
+    registry[key] = true;
     balances[key] = delegatedSupply;
 
     RegisterAssetTxArgs memory txArgs = RegisterAssetTxArgs({
@@ -68,7 +73,11 @@ function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes
 }
 ```
 
-The `registerAsset` function can be implemented as:
+The `registerAsset` is called by cross-chain transactions from other LockProxies.
+The purpose of this function is to update the `registry` mapping which will be checked when a user calls the `lock` function.
+This helps to ensure that the user does not call `lock` with incorrect parameters.
+
+In the LockProxy, `registerAsset` can be implemented as:
 ```
 function registerAsset(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromChainId) onlyManagerContract public {
   TxRegisterAssetArgs memory args = _deserializTxRegisterAssetArgs(argsBs);
@@ -80,7 +89,6 @@ function registerAsset(bytes memory argsBs, bytes memory fromContractAddr, uint6
   registry[key] = true;
 }
 ```
-
 
 `setManagerProxy` can be restricted to be called once. After it is called the first time, the `managerProxyContract` address cannot be changed.
 
@@ -94,13 +102,14 @@ The `lock` function can be modified to require the following parameters:
 - bytes memory toAddress
 - uint256 amount
 
-The LockProxy contract should maintain a `balances` mapping of (bytes32 => uint256).
-This `balances` mapping should be updated within the `lock` function:
+The `balances` mapping should be updated within the `lock` function:
 ```
 bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
 require(registry[key] == true);
 
 balances[key] += amount;
+
+// transfer tokens from user to LockProxy
 
 address fromContractAddr = address(this);
 TxArgs memory txArgs = TxArgs({
@@ -130,6 +139,8 @@ bytes32 key = hash(args.toAssetHash, args.fromChainId, args.fromContractAddr, ar
 require(registry[key] == true);
 require(balances[key] >= args.amount);
 balances[key] -= args.amount;
+
+// send tokens to `toAddress`
 
 emit UnlockEvent(address toAssetHash, address toAddress, uint256 amount, ...optional);
 ```
