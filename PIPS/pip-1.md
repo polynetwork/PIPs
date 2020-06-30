@@ -123,17 +123,15 @@ function lock(address fromAssetHash, uint64 toChainId, bytes memory targetProxyH
 The LockProxy should have an `unlock` function which can be called only by the cross-chain manager contract. The function validates the parameters then sends the tokens to the `toAddress`:
 ```
 struct TxArgs {
-  bytes fromContractAddr;
   bytes fromAssetHash;
-  uint64 fromChainId;
   bytes toAssetHash;
   bytes toAddress;
   uint256 amount;
 }
 
-function unlock(bytes memory argsBs) onlyManagerContract {
+function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromChainId) onlyManagerContract {
   TxArgs memory args = _deserializTxArgs(argsBs);
-  bytes32 key = hash(args.toAssetHash, args.fromChainId, args.fromContractAddr, args.fromAssetHash);
+  bytes32 key = hash(args.toAssetHash, fromChainId, fromContractAddr, args.fromAssetHash);
 
   require(registry[key] == true);
   require(balances[key] >= args.amount);
