@@ -36,33 +36,51 @@ constructor (address lockProxyContractAddress, uint64 nativeChainId, bytes memor
 
 In the LockProxy, `delegateAsset` can be implemented as:
 ```
-struct DelegatedAsset {
-    uint64 nativeChainId;
-    bytes nativeLockProxy;
-    bytes nativeAssetHash;
-}
-
-mapping(address => DelegatedAsset) delegatedAssets;
+mapping(bytes32 => bool) registry;
 mapping(bytes32 => uint256) balances;
 
-function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes memory nativeAssetHash, uint256 totalSupply) public {
+struct RegisterAssetTxArgs {
+  bytes assetHash;
+  bytes nativeAssetHash;
+}
+
+function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes memory nativeAssetHash, uint256 delegatedSupply) public {
     address assetHash = _msgSender();
 
-    require(nativeChainId != 0);
-    require(delegatedAssets[assetHash].nativeChainId == 0);
-    require(getBalanceFor(assetHash) == totalSupply);
-
     // `hash` is any supported hashing function of the respective blockchain
-    bytes32 key = hash(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash);
+    key = hash(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash);
 
+    require(registry[key] != true);
     require(balances[key] == 0);
-    balances[key] = totalSupply;
+    require(getBalanceFor(assetHash) == delegatedSupply);
 
-    delegatedAssets[_msgSender()] = DelegatedAsset(nativeChainId, nativeLockProxy, nativeAssetHash);
+    balances[key] = delegatedSupply;
+
+    RegisterAssetTxArgs memory txArgs = RegisterAssetTxArgs({
+        assetHash: assetHash,
+        nativeAssetHash: nativeAssetHash
+    });
+
+    bytes memory txData = _serializeRegisterAssetTxArgs(txArgs);
+    require(eccm.crossChain(nativeChainId, nativeLockProxy, "registerAsset", txData), "EthCrossChainManager crossChain executed error!");
+
+    emit DelegateAsset(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash);
 }
 ```
 
-This mapping will be used in the `unlock` function to ensure that delegated tokens will be unlocked only if the correct corresponding token is locked.
+The `registerAsset` function can be implemented as:
+```
+function registerAsset(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromChainId) onlyManagerContract public {
+  TxRegisterAssetArgs memory args = _deserializTxRegisterAssetArgs(argsBs);
+
+  // `hash` is any supported hashing function
+  key = hash(args.nativeAssetHash, fromChainId, fromContractAddr, args.assetHash);
+
+  require(registry[key] != true);
+  registry[key] = true;
+}
+```
+
 
 `setManagerProxy` can be restricted to be called once. After it is called the first time, the `managerProxyContract` address cannot be changed.
 
@@ -79,18 +97,8 @@ The `lock` function can be modified to require the following parameters:
 The LockProxy contract should maintain a `balances` mapping of (bytes32 => uint256).
 This `balances` mapping should be updated within the `lock` function:
 ```
-// help prevent user mistakes by ensuring delegated assets only get transferred
-// to the native chainId, LockProxy and assetHash that was originally specified
-DelegatedAsset dAsset = delegatedAssets[fromAssetHash];
-if (dAsset.nativeChainId != 0) {
-    require(
-        dAsset.nativeChainId == toChainId &&
-        dAsset.nativeLockProxy == targetProxyHash &&
-        dAsset.nativeAssetHash == toAssetHash
-    );
-}
-
 bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
+require(registry[key] == true);
 
 balances[key] += amount;
 
@@ -104,6 +112,8 @@ TxArgs memory txArgs = TxArgs({
 });
 bytes memory txData = _serializeTxArgs(txArgs);
 
+require(eccm.crossChain(toChainId, targetProxyHash, "unlock", txData), "EthCrossChainManager crossChain executed error!");
+
 emit LockEvent(address fromAssetHash, address fromAddress, uint64 toChainId, bytes toAssetHash, bytes toAddress, uint256 amount, ...optional);
 ```
 
@@ -115,17 +125,9 @@ Where `argsBs` contains `fromContractAddr`, `fromAssetHash`, `fromChainId`, `toA
 The contract should check that the balances are sufficient, then reduce the balance and perform the unlock:
 ```
 TxArgs memory args = _deserializTxArgs(argsBs);
-DelegatedAsset dAsset = delegatedAssets[args.toAssetHash];
-
-if (dAsset.nativeChainId != 0) {
-    require(
-        dAsset.nativeChainId == args.fromChainId &&
-        dAsset.nativeLockProxy == args.fromContractAddr &&
-        dAsset.nativeAssetHash == args.fromAssetHash
-    );
-}
-
 bytes32 key = hash(args.toAssetHash, args.fromChainId, args.fromContractAddr, args.fromAssetHash);
+
+require(registry[key] == true);
 require(balances[key] >= args.amount);
 balances[key] -= args.amount;
 
