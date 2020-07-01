@@ -96,17 +96,24 @@ function registerAsset(bytes memory argsBs, bytes memory fromContractAddr, uint6
 
 The LockProxy should have a `lock` function which locks tokens from the user and sends a cross-chain transaction to unlock tokens on the targeted `toChainId` and `targetProxyHash`:
 ```
+struct TxArgs {
+  bytes fromAssetHash;
+  bytes toAssetHash;
+  bytes toAddress;
+  uint256 amount;
+}
+
 function lock(address fromAssetHash, uint64 toChainId, bytes memory targetProxyHash, bytes memory toAssetHash, bytes memory toAddress, uint256 amount) public {
   bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
   require(registry[key] == true);
 
-  balances[key] += amount;
+  // Use SafeMath to ensure balances do not overflow
+  balances[key] = balances[key].add(amount);
 
   // transfer tokens from user to LockProxy
 
   address fromContractAddr = address(this);
   TxArgs memory txArgs = TxArgs({
-      fromContractAddr: fromContractAddr,
       fromAssetHash: fromAssetHash,
       toAssetHash: toAssetHash,
       toAddress: toAddress,
@@ -122,23 +129,20 @@ function lock(address fromAssetHash, uint64 toChainId, bytes memory targetProxyH
 
 The LockProxy should have an `unlock` function which can be called only by the cross-chain manager contract. The function validates the parameters then sends the tokens to the `toAddress`:
 ```
-struct TxArgs {
-  bytes fromAssetHash;
-  bytes toAssetHash;
-  bytes toAddress;
-  uint256 amount;
-}
-
-function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromChainId) onlyManagerContract {
+function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromChainId) onlyManagerContract returns (bool) {
   TxArgs memory args = _deserializTxArgs(argsBs);
   bytes32 key = hash(args.toAssetHash, fromChainId, fromContractAddr, args.fromAssetHash);
 
   require(registry[key] == true);
   require(balances[key] >= args.amount);
-  balances[key] -= args.amount;
+
+  // Use SafeMath to ensure balances do not overflow
+  balances[key] = balances[key].sub(args.amount);
 
   // send tokens to `toAddress`
 
   emit UnlockEvent(address toAssetHash, address toAddress, uint256 amount, ...optional);
+
+  return true;
 }
 ```
