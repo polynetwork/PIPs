@@ -12,7 +12,7 @@ The current LockProxy implementation does not have an in-built method for relaye
 This PIP proposes a simple method to charge fees.
 
 ## Motivation
-Network fees can very expensive. For example, the total Ethereum network fees for some popular DApps can cost up to 500k USD over 30 days (source: https://ethgasstation.info/).
+Network fees can be very expensive. For example, the total Ethereum network fees for some popular DApps can cost up to 500k USD over 30 days (source: https://ethgasstation.info/).
 
 ## Specification
 The `lock` and `unlock` function of the LockProxy can be modified to include the following parameters:
