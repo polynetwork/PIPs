@@ -53,18 +53,20 @@ function lock(
       fromAssetHash: fromAssetHash,
       toAssetHash: toAssetHash,
       toAddress: toAddress,
-      amount: remainingAmount,
+      amount: amount,
       feeAmount: feeAmount,
       feeReceiverAddr: feeReceiverAddr
   });
 
-  uint256 remainingAmount = amount;
   if (feeAmount > 0 && deductFeeInLock) {
     // ensure that there is no overflow
-    remainingAmount = amount.sub(feeAmount);
+    uint256 afterFeeAmount = amount.sub(feeAmount);
+
+    require(_transferFromContract(fromAssetHash, feeReceiverAddr, feeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
 
     // change fee amount to zero as the fee has already been deducted
     txArgs.feeAmount = 0;
+    txArgs.amount = afterFeeAmount
   }
 
   bytes memory txData = _serializeTxArgs(txArgs);
@@ -87,25 +89,25 @@ function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromC
   // Use SafeMath to ensure balances do not overflow
   balances[key] = balances[key].sub(args.amount);
 
-  uint256 remainingAmount = args.amount;
+  uint256 afterFeeAmount = args.amount;
   if (args.feeAmount > 0) {
     // ensure that there is no overflow
-    remainingAmount = amount.sub(args.feeAmount);
+    afterFeeAmount = amount.sub(args.feeAmount);
 
     // transfer feeAmount to feeReceiverAddr
-    require(_transferFromContract(fromAddress, feeReceiverAddr, feeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
+    require(_transferFromContract(args.toAssetHash, feeReceiverAddr, feeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
   }
 
   // send tokens to `toAddress`
-  require(_transferFromContract(args.toAssetHash, toAddress, remainingAmount), "transfer asset from lock_proxy contract to toAddress failed!");
+  require(_transferFromContract(args.toAssetHash, toAddress, afterFeeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
 
-  emit UnlockEvent(fromContractAddr, fromChainId, args.toAddress, remainingAmount);
+  emit UnlockEvent(fromContractAddr, fromChainId, args.toAddress, afterFeeAmount);
 
   return true;
 }
 ```
 
-If `deductFeeInLock` is set to `true`, it is possible for a relayer to only send the `lock` transaction, claim their fee, and then not send the `unlock` transaction to the target chain.
+If `deductFeeInLock` is set to `true`, it is possible for a relayer to receive the fee, and then not send the transaction to the PolyChain or the target chain.
 
 This PIP does not propose a fixed solution to this issue, but possible solutions include:
 1. Requiring deductFeeInLock to be false
