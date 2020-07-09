@@ -111,3 +111,5 @@ This PIP does not propose a fixed solution to this issue, but possible solutions
 1. Requiring deductFeeInLock to be false
 2. Having a reputation system for relayers
 3. Requiring relayers to have some value staked, which can be slashed if they are reported for slow broadcasts or non-broadcasts
+
+This proposal does not allow for the fee asset to be different from the asset being transferred, the option for this could be covered in a different PIP.
