@@ -15,36 +15,99 @@ This PIP proposes a simple method to charge fees.
 Network fees can be very expensive. For example, the total Ethereum network fees for some popular DApps can cost up to 500k USD over 30 days (source: https://ethgasstation.info/).
 
 ## Specification
-The `lock` and `unlock` function of the LockProxy can be modified to include the following parameters:
-- bytes memory feeReceiverAddr
-- address feeAssetHash
-- uint256 feeAmount
-- uint64 feeChainId
 
-The `feeAmount` indicates how much of the locked `amount` should be deducted and given to the `feeReceiverAddr`. The `feeChainId` allows control over which chain the fee deduction should be performed at.
-
-Example fee deduction implementation:
+Example fee deduction implementation for lock:
 ```
-uint256 remainingAmount = amount;
-
-if (feeAmount > 0 && self.chainId == feeChainId) {
-  // for `lock` the comparison should be fromAssetHash == feeAssetHash
-  // for `unlock` the comparison should be toAssetHash == feeAssetHash
-  if (fromAssetHash == feeAssetHash) {
-    remainingAmount -= feeAmount;
-  } else {
-    // deduct feeAmount from the user's balance
-  }
-
-  // transfer feeAmount to feeReceiverAddr
+struct TxArgs {
+  bytes fromAssetHash;
+  bytes toAssetHash;
+  bytes toAddress;
+  uint256 amount;
+  uint256 feeAmount;
+  bytes feeReceiverAddr;
 }
 
-// transfer remainingAmount to user address
+function lock(
+  address fromAssetHash,
+  uint64 toChainId,
+  bytes memory targetProxyHash,
+  bytes memory toAssetHash,
+  bytes memory toAddress,
+  uint256 amount,
+  bool deductFeeInLock,
+  uint256 feeAmount,
+  bytes memory feeReceiverAddr
+)
+  public
+{
+  bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
+  require(registry[key] == true);
+
+  // Use SafeMath to ensure balances do not overflow
+  balances[key] = balances[key].add(amount);
+
+  // transfer tokens from user to LockProxy
+  require(_transferToContract(fromAssetHash, amount), "transfer asset from fromAddress to lock_proxy contract failed!");
+
+  TxArgs memory txArgs = TxArgs({
+      fromAssetHash: fromAssetHash,
+      toAssetHash: toAssetHash,
+      toAddress: toAddress,
+      amount: remainingAmount,
+      feeAmount: feeAmount,
+      feeReceiverAddr: feeReceiverAddr
+  });
+
+  uint256 remainingAmount = amount;
+  if (feeAmount > 0 && deductFeeInLock) {
+    // ensure that there is no overflow
+    remainingAmount = amount.sub(feeAmount);
+
+    // change fee amount to zero as the fee has already been deducted
+    txArgs.feeAmount = 0;
+  }
+
+  bytes memory txData = _serializeTxArgs(txArgs);
+
+  require(eccm.crossChain(toChainId, targetProxyHash, "unlock", txData), "EthCrossChainManager crossChain executed error!");
+
+  emit LockEvent(address(this), toChainId, targetProxyHash, txData);
+}
 ```
 
-If the feeChainId is not the target chain, it is possible for a relayer to only send the transaction to the originating chain, claim their fee, and then not send the second transaction to the target chain.
+Example fee deduction implementation for unlock:
+```
+function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromChainId) onlyManagerContract returns (bool) {
+  TxArgs memory args = _deserializTxArgs(argsBs);
+  bytes32 key = hash(args.toAssetHash, fromChainId, fromContractAddr, args.fromAssetHash);
+
+  require(registry[key] == true);
+  require(balances[key] >= args.amount);
+
+  // Use SafeMath to ensure balances do not overflow
+  balances[key] = balances[key].sub(args.amount);
+
+  uint256 remainingAmount = args.amount;
+  if (args.feeAmount > 0) {
+    // ensure that there is no overflow
+    remainingAmount = amount.sub(args.feeAmount);
+
+    // transfer feeAmount to feeReceiverAddr
+    require(_transferFromContract(fromAddress, feeReceiverAddr, feeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
+  }
+
+  // send tokens to `toAddress`
+  require(_transferFromContract(args.toAssetHash, toAddress, remainingAmount), "transfer asset from lock_proxy contract to toAddress failed!");
+
+  emit UnlockEvent(fromContractAddr, fromChainId, args.toAddress, remainingAmount);
+
+  return true;
+}
+```
+
+If `deductFeeInLock` is set to `true`, it is possible for a relayer to only send the `lock` transaction, claim their fee, and then not send the `unlock` transaction to the target chain.
 
 This PIP does not propose a fixed solution to this issue, but possible solutions include:
-1. Requiring the feeChainId to be the target chain
+1. Requiring deductFeeInLock to be false
 2. Having a reputation system for relayers
 3. Requiring relayers to have some value staked, which can be slashed if they are reported for slow broadcasts or non-broadcasts
