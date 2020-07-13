@@ -112,7 +112,6 @@ function lock(address fromAssetHash, uint64 toChainId, bytes memory targetProxyH
 
   // transfer tokens from user to LockProxy
 
-  address fromContractAddr = address(this);
   TxArgs memory txArgs = TxArgs({
       fromAssetHash: fromAssetHash,
       toAssetHash: toAssetHash,
