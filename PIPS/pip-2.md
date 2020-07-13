@@ -43,9 +43,6 @@ function lock(
   bytes32 key = hash(fromAssetHash, toChainId, targetProxyHash, toAssetHash);
   require(registry[key] == true);
 
-  // Use SafeMath to ensure balances do not overflow
-  balances[key] = balances[key].add(amount);
-
   // transfer tokens from user to LockProxy
   require(_transferToContract(fromAssetHash, amount), "transfer asset from fromAddress to lock_proxy contract failed!");
 
@@ -68,6 +65,9 @@ function lock(
     txArgs.feeAmount = 0;
     txArgs.amount = afterFeeAmount
   }
+
+  // Use SafeMath to ensure balances do not overflow
+  balances[key] = balances[key].add(txArgs.amount);
 
   bytes memory txData = _serializeTxArgs(txArgs);
 
@@ -96,6 +96,7 @@ function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromC
 
     // transfer feeAmount to feeReceiverAddr
     require(_transferFromContract(args.toAssetHash, feeReceiverAddr, feeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
+    emit UnlockEvent(fromContractAddr, fromChainId, feeReceiverAddr, feeAmount);
   }
 
   // send tokens to `toAddress`
