@@ -73,7 +73,7 @@ function lock(
 
   require(eccm.crossChain(toChainId, targetProxyHash, "unlock", txData), "EthCrossChainManager crossChain executed error!");
 
-  emit LockEvent(address(this), toChainId, targetProxyHash, txData);
+  emit LockEvent(fromAssetHash, _msgSender(), toChainId, toAssetHash, toAddress, txArgs.amount);
 }
 ```
 
@@ -96,13 +96,13 @@ function unlock(bytes memory argsBs, bytes memory fromContractAddr, uint64 fromC
 
     // transfer feeAmount to feeReceiverAddr
     require(_transferFromContract(args.toAssetHash, feeReceiverAddr, feeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
-    emit UnlockEvent(fromContractAddr, fromChainId, feeReceiverAddr, feeAmount);
+    emit UnlockEvent(args.toAssetHash, feeReceiverAddr, feeAmount);
   }
 
   // send tokens to `toAddress`
   require(_transferFromContract(args.toAssetHash, toAddress, afterFeeAmount), "transfer asset from lock_proxy contract to toAddress failed!");
 
-  emit UnlockEvent(fromContractAddr, fromChainId, args.toAddress, afterFeeAmount);
+  emit UnlockEvent(args.toAssetHash, args.toAddress, afterFeeAmount);
 
   return true;
 }
