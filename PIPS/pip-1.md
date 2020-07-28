@@ -73,6 +73,18 @@ function delegateAsset(uint64 nativeChainId, bytes memory nativeLockProxy, bytes
 }
 ```
 
+Take note that for the `hash` function, each input param should be hashed first, to prevent key collision attacks. Example of hashing first:
+```
+function hash(assetHash, nativeChainId, nativeLockProxy, nativeAssetHash) {
+  return sha256(
+    sha256(assetHash),
+    sha256(nativeChainId),
+    sha256(nativeLockProxy),
+    sha256(nativeAssetHash)
+  )
+}
+```
+
 The `registerAsset` is called by cross-chain transactions from other LockProxies.
 The purpose of this function is to update the `registry` mapping which will be checked when a user calls the `lock` function.
 This helps to ensure that the user does not call `lock` with incorrect parameters.
