@@ -64,7 +64,7 @@ Detailed implementation is provided as following:
 
 ##### Asset swap
 
-<div align=center><img width="300" height="600" src="pic/LPswap.jpeg"/></div>
+<div align=center><img width="300" height="600" src="pic/LPSwap.jpeg"/></div>
 
 Based on the methods mentioned above, the new lock proxy contract offers an option for users to swap their assets to either LP token or valuable asset token on target chain. The above flow chart shows the process of how user swap asset to their target token. 
 
