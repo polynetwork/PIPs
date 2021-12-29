@@ -129,7 +129,7 @@ Events:
 - `withdrawEvent(address toAddress, address fromAssetHash, address fromLPHash, uint256 amount)`
 - `BindLPToAssetEvent(address originAssetAddress, address LPTokenAddress)`
 
-You may refer to the full [code](https://github.com/KSlashh/eth-contracts/blob/testnet/contracts/core/lock_proxy/LockProxyWithLP.sol) of `LockProxyWithLP` contract . 
+You may refer to the full [code](https://github.com/polynetwork/eth-contracts/blob/master/contracts/core/lock_proxy/LockProxyWithLP.sol) of `LockProxyWithLP` contract . 
 
 
 
