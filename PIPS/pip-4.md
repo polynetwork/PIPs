@@ -1,6 +1,6 @@
 | pip  | title                                        | status | author                                           | created    |
 | ---- | -------------------------------------------- | ------ | ------------------------------------------------ | ---------- |
-| 4    | LockProxy contract providing liquidity proof | Draft  | Xu Jie(@[crossjay](https://github.com/crossjay)) | 2021-12-23 |
+| 4    | LockProxy contract providing liquidity proof | Draft  | Joseph Xu(@[crossjay](https://github.com/crossjay)) | 2021-12-29 |
 
 ## Simple Summary
 
